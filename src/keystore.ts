@@ -83,6 +83,13 @@ const PS_FLAGS = [
   "-Command",
 ];
 
+/**
+ * Bounds every shell-out. Without it a stalled `powershell.exe` (no
+ * interactive session, cold WinRT assembly load, AV scanning) blocks forever
+ * and only a CI job timeout ever reaps it, leaving a dangling process.
+ */
+const EXEC_TIMEOUT_MS = 5_000;
+
 function run(
   file: string,
   args: string[],
@@ -94,6 +101,7 @@ function run(
     input: options.input,
     stdio: ["pipe", "pipe", "pipe"],
     windowsHide: true,
+    timeout: EXEC_TIMEOUT_MS,
   });
 }
 
@@ -363,7 +371,6 @@ export function osKeyStore(options: OsKeyStoreOptions = {}): KeyStore {
     options.fallback === "none"
       ? undefined
       : fileBackend(options.fallbackDir ?? join(homedir(), ".safejsoncontext"));
-  const backend = resolveBackend(fallback);
 
   function unsupported(): Error {
     return new Error(
@@ -373,11 +380,17 @@ export function osKeyStore(options: OsKeyStoreOptions = {}): KeyStore {
 
   return {
     id: `${service}/${account}`,
-    backend: backend?.name ?? "file",
+    // Resolving costs a process spawn (the probe), so it happens here, on
+    // first actual use, rather than when this store is constructed — a
+    // JsonContext with no `encrypt` fields never has to pay it.
+    get backend(): BackendName {
+      return resolveBackend(fallback)?.name ?? "file";
+    },
 
     exists(): SafeResult<boolean> {
-      if (!backend) return fail(unsupported());
       if (cache.has(cacheKey)) return ok(true);
+      const backend = resolveBackend(fallback);
+      if (!backend) return fail(unsupported());
       try {
         return ok(backend.get(service, account) !== undefined);
       } catch (error) {
@@ -386,6 +399,7 @@ export function osKeyStore(options: OsKeyStoreOptions = {}): KeyStore {
     },
 
     ensure(): SafeResult<boolean> {
+      const backend = resolveBackend(fallback);
       if (!backend) return fail(unsupported());
       try {
         if (cache.has(cacheKey) || backend.get(service, account) !== undefined) {
@@ -399,6 +413,7 @@ export function osKeyStore(options: OsKeyStoreOptions = {}): KeyStore {
     },
 
     remove(): SafeResult<boolean> {
+      const backend = resolveBackend(fallback);
       if (!backend) return fail(unsupported());
       cache.delete(cacheKey);
       try {
@@ -411,6 +426,7 @@ export function osKeyStore(options: OsKeyStoreOptions = {}): KeyStore {
     [KEY_MATERIAL](): SafeResult<Buffer> {
       const cached = cache.get(cacheKey);
       if (cached) return ok(cached);
+      const backend = resolveBackend(fallback);
       if (!backend) return fail(unsupported());
 
       try {
