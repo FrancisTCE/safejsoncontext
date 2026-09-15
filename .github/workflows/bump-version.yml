@@ -8,7 +8,7 @@ name: bump & publish
 #
 # This needs a GitHub PAT with "Contents: read and write" on this repo
 # (Settings → Developer settings → Personal access tokens → Fine-grained
-# tokens, repository access: gresui-web, permissions: Contents read/write).
+# tokens, repository access: safejsoncontext, permissions: Contents read/write).
 # Store it as the GH_PAT secret in the "NPM" environment — the default
 # GITHUB_TOKEN cannot push back to the repo, which is why the PAT is
 # required here.

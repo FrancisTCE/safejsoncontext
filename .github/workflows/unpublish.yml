@@ -22,7 +22,7 @@ on:
         required: true
         type: string
       confirm:
-        description: "Type <package>@<version> exactly, e.g. gresui-web@1.3.0"
+        description: "Type <package>@<version> exactly, e.g. safejsoncontext@0.1.0"
         required: true
         type: string
       dry_run:
