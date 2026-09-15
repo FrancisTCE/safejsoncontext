@@ -1,5 +1,7 @@
 # safejsoncontext
 
+Just to be clear, the reason I created this repo was because i was using this for RHI agentic context, its usefull if well used, I decided to clean it up a repack it as a npm pkg.
+
 A JSON file with per-field access, field-level encryption under a key the
 operating system holds, optional schema validation, and a cross-process lock
 around every mutation. Built for agentic context: the file stays readable and
