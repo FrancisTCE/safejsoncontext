@@ -1,0 +1,65 @@
+name: bump & publish
+
+# Bump the version and push the tag. Publishing then happens by creating a
+# GitHub Release from that tag (Releases → "Draft a new release" → choose
+# the tag) — the release triggers .github/workflows/publish.yml, which
+# publishes to npm with the NPM_TOKEN secret.
+# Run it from the Actions tab ("Run workflow" → choose patch/minor/major).
+#
+# This needs a GitHub PAT with "Contents: read and write" on this repo
+# (Settings → Developer settings → Personal access tokens → Fine-grained
+# tokens, repository access: gresui-web, permissions: Contents read/write).
+# Store it as the GH_PAT secret in the "NPM" environment — the default
+# GITHUB_TOKEN cannot push back to the repo, which is why the PAT is
+# required here.
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Version bump"
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+        default: patch
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    # GH_PAT lives in the "NPM" GitHub environment (same place as NPM_TOKEN) —
+    # a job must declare the environment for its secrets to be visible.
+    environment: NPM
+    permissions:
+      contents: write
+    steps:
+      - name: Check GH_PAT is set
+        env:
+          TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          test -n "$TOKEN" || { echo "GH_PAT is empty — add it to the NPM environment (Settings → Environments → NPM)"; exit 1; }
+      - uses: actions/checkout@v5
+        with:
+          token: ${{ secrets.GH_PAT }}
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Bump version and tag
+        env:
+          BUMP: ${{ inputs.bump }}
+        run: |
+          case "$BUMP" in patch|minor|major) ;; *) echo "invalid bump: $BUMP"; exit 1;; esac
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          npm version "$BUMP"
+
+      - name: Push commit and tag
+        run: |
+          git push
+          git push --tags
