@@ -1,6 +1,6 @@
 {
   "name": "safejsoncontext",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A JSON context file with per-field access, AES-256-GCM field encryption under an OS-held key, Standard Schema validation, and a cross-process lock on every mutation.",
   "repository": {
     "type": "git",
