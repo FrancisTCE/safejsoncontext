@@ -27,42 +27,58 @@ npm install safejsoncontext
 ```js
 import { createContext } from "safejsoncontext";
 
-const ctx = createContext("./.myapp/context.json", {
-  defaults: { model: "claude-opus-5", runs: 0, apiKey: "" },
+const ctx = createContext("./.agent/context.json", {
+  defaults: { model: "claude-opus-5", turns: 0, memory: [], apiKey: "" },
   encrypt: ["apiKey"],
 });
 
-ctx.init();                              // create from defaults if missing
-ctx.set("apiKey", "sk-live-…");          // encrypted on the way to disk
-ctx.update("runs", (n) => n + 1);        // locked read-modify-write
+ctx.init();                                    // create from defaults if missing
+ctx.set("apiKey", "sk-ant-…");                 // encrypted on the way to disk
+ctx.update("turns", (n) => n + 1);             // locked read-modify-write
+ctx.update("memory", (m) => [...m, "user prefers metric units"]);
 
-ctx.get("runs");                         // { ok: true, value: 1 }
-ctx.get("apiKey");                       // { ok: false, error: … use reveal("apiKey") }
-ctx.reveal("apiKey");                    // { ok: true, value: "sk-live-…" }
+ctx.get("turns");                              // { ok: true, value: 1 }
+ctx.get("apiKey");                             // { ok: false, error: … use reveal("apiKey") }
+ctx.reveal("apiKey");                          // { ok: true, value: "sk-ant-…" }
 ```
 
-Nothing touches the disk until a method runs. The directory is created on the
-first write.
+An agent context that survives restarts: the model choice and the memory it has
+accumulated stay readable and diffable, the credential does not. Two agent
+processes incrementing `turns` on the same file cannot lose a turn. Nothing
+touches the disk until a method runs — the directory is created on the first
+write.
 
 ### Session context — the same thing, in memory
+
+Per-conversation variables that must not outlive the process: turn counters,
+tool history, the end user's token for this thread.
 
 ```js
 import { createSessionContext } from "safejsoncontext";
 
-const session = createSessionContext("agent-42", { encrypt: ["token"] });
-session.set("token", "sk-…");
-session.get("token");      // { ok: false, error: … use reveal("token") }
-session.reveal("token");   // { ok: true, value: "sk-…" }
+const session = createSessionContext("thread-42", {
+  defaults: { turn: 0, toolCalls: [], userToken: "" },
+  encrypt: ["userToken"],
+});
+
+session.set("userToken", "ya29.a0Ae…");            // the end user's OAuth token
+session.update("turn", (n) => n + 1);
+session.update("toolCalls", (calls) => [...calls, "search_docs"]);
+
+session.get("userToken");      // { ok: false, error: … use reveal("userToken") }
+session.reveal("userToken");   // { ok: true, value: "ya29.a0Ae…" }
 ```
 
 Identical API, but the document lives in this process only: never written
 anywhere, gone when the process exits. Every handle created with the same name
-shares the same document, so modules can meet at a session by name. Meant for
+shares the same document, so the model loop, a tool handler and a subagent can
+all meet at one thread id without a reference being passed around. Meant for
 sensitive working state — the censored `read()` / `get()` behaviour is still
-what every caller gets unless they `reveal`, but there is nothing on disk to
-protect. Session secrets are encrypted under a key that lives in the process
-by default (`keystore.backend === "memory"`); pass `keystore: osKeyStore()` if
-their envelopes must be readable by a file context later.
+what every caller gets unless they `reveal`, so a tool that dumps its session
+for a trace logs `{ __enc: 1, … }` where the user's token is. Session secrets
+are encrypted under a key that lives in the process by default
+(`keystore.backend === "memory"`); pass `keystore: osKeyStore()` if their
+envelopes must be readable by a file context later.
 
 `hasSession(name)`, `sessionNames()` and `dropSession(name)` manage the
 per-process registry. `pretty`, `durable` and `lock` do not apply.
@@ -129,17 +145,17 @@ of convenience:
 
 ```ts
 // 1. from defaults
-const ctx = createContext("…", { defaults: { runs: 0, apiKey: "" } });
+const ctx = createContext("…", { defaults: { turns: 0, apiKey: "" } });
 
 // 2. from a schema — types and runtime validation from one source
-const ctx = createContext("…", { schema: z.object({ runs: z.number(), apiKey: z.string() }) });
+const ctx = createContext("…", { schema: z.object({ turns: z.number(), apiKey: z.string() }) });
 
 // 3. explicitly
-interface AppContext { runs: number; apiKey: string }
-const ctx = createContext<AppContext>("…");
+interface AgentContext { model: string; turns: number; apiKey: string }
+const ctx = createContext<AgentContext>("…");
 ```
 
-All three give you `ctx.get("ru` completing to `runs`, `ctx.set("runs", "x")`
+All three give you `ctx.get("tu` completing to `turns`, `ctx.set("turns", "x")`
 as a type error, and `encrypt: ["apiKe` completing too.
 
 ## Encryption
@@ -153,6 +169,8 @@ On disk, the field name stays readable and the value does not:
 ```json
 {
   "model": "claude-opus-5",
+  "turns": 12,
+  "memory": ["user prefers metric units"],
   "apiKey": { "__enc": 1, "alg": "aes-256-gcm", "iv": "…", "tag": "…", "data": "…" }
 }
 ```
@@ -196,11 +214,12 @@ store to the cipher through a module-private symbol that is not exported.
 ```js
 import { osKeyStore } from "safejsoncontext";
 
-const store = osKeyStore({ service: "my-agent", account: "prod" });
+// One key per agent per environment: the dev agent cannot read prod's context.
+const store = osKeyStore({ service: "research-agent", account: "prod" });
 store.ensure();   // { ok: true, value: true } when it created one
 store.remove();   // anything encrypted with it is now unreadable
 
-createContext("…", { encrypt: ["apiKey"], keystore: store });
+createContext("./.agent/context.json", { encrypt: ["apiKey"], keystore: store });
 ```
 
 `memoryKeyStore(key?)` is the in-process store for tests. It protects nothing.
@@ -208,7 +227,7 @@ createContext("…", { encrypt: ["apiKey"], keystore: store });
 ### Crypto details
 
 AES-256-GCM, a fresh 96-bit IV per value, and the **field name authenticated as
-additional data**, so a ciphertext moved from `notes` to `apiKey` fails the tag
+additional data**, so a ciphertext moved from `memory` to `apiKey` fails the tag
 check. Values are JSON-encoded before encryption, so any JSON value works.
 Tampering fails the read rather than returning a wrong value.
 
@@ -231,13 +250,22 @@ hand-written object — plugs in with no dependency on any of them.
 ```js
 import { z } from "zod";
 
-const ctx = createContext("…", {
-  schema: z.object({ runs: z.number().int(), apiKey: z.string().startsWith("sk-") }),
+const ctx = createContext("./.agent/context.json", {
+  schema: z.object({
+    model: z.enum(["claude-opus-5", "claude-sonnet-5"]),
+    turns: z.number().int().nonnegative(),
+    apiKey: z.string().startsWith("sk-ant-"),
+  }),
   encrypt: ["apiKey"],
 });
 
-ctx.set("runs", "seven");   // { ok: false, error: SchemaError: runs: Expected number … }
+ctx.set("turns", "seven");   // { ok: false, error: SchemaError: turns: Expected number … }
+ctx.set("model", "gpt-4");   // { ok: false, error: SchemaError: model: … } — nothing written
 ```
+
+Pinning the model to an enum and the key to a prefix means a hand-edited
+context file, or an agent that writes its own config, cannot put the loop into
+a state the code does not expect.
 
 The schema describes the **plaintext** document. It runs on every mutation
 (before encryption — nothing invalid reaches the disk) and on every decrypted
@@ -445,7 +473,7 @@ living.
   mutation. That is usually what you want; it is worth knowing.
 - Whole-object schemas mean every mutation with a schema decrypts every secret
   field to validate, which touches the key store on the first one even when
-  you only changed `runs`.
+  you only changed `turns`.
 
 #### Performance
 
