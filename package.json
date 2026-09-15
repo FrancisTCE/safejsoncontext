@@ -2,6 +2,14 @@
   "name": "safejsoncontext",
   "version": "0.1.0",
   "description": "A JSON context file with per-field access, AES-256-GCM field encryption under an OS-held key, Standard Schema validation, and a cross-process lock on every mutation.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/FrancisTCE/safejsoncontext.git"
+  },
+  "homepage": "https://github.com/FrancisTCE/safejsoncontext#readme",
+  "bugs": {
+    "url": "https://github.com/FrancisTCE/safejsoncontext/issues"
+  },
   "license": "MIT",
   "author": {
     "name": "FrancisTCE",
@@ -38,7 +46,6 @@
     "jsonContext",
     "agenticRHIContext",
     "RHI",
-    "context",
     "config",
     "atomic",
     "lock",
