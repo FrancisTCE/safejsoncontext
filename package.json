@@ -1,0 +1,63 @@
+{
+  "name": "safejsoncontext",
+  "version": "0.1.0",
+  "description": "A JSON context file with per-field access, AES-256-GCM field encryption under an OS-held key, Standard Schema validation, and a cross-process lock on every mutation.",
+  "license": "MIT",
+  "author": {
+    "name": "FrancisTCE",
+    "email": "65885925+FrancisTCE@users.noreply.github.com",
+    "url": "https://github.com/FrancisTCE/safejsoncontext"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
+    "test": "npm run build && node --test \"test/**/*.test.js\"",
+    "prepublishOnly": "npm run clean && npm run build",
+    "bench": "npm run build && node scripts/bench.mjs",
+    "showcase": "npm run build && node examples/showcase.mjs"
+  },
+  "keywords": [
+    "json",
+    "jsonData",
+    "context",
+    "jsonContext",
+    "agenticRHIContext",
+    "RHI",
+    "context",
+    "config",
+    "atomic",
+    "lock",
+    "file-lock",
+    "safe",
+    "encryption",
+    "aes-256-gcm",
+    "keychain",
+    "credential-manager",
+    "libsecret",
+    "standard-schema",
+    "agent",
+    "llm-context"
+  ],
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
