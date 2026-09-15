@@ -1,6 +1,6 @@
 # safejsoncontext
 
-Just to be clear, the reason I created this repo was because i was using this for RHI agentic context, its usefull if well used, I decided to clean it up a repack it as a npm pkg.
+Just to be clear, the reason I created this repo was because i was using this for RHI agentic context, its usefull if well used, I decided to clean it up a repack it as a npm pkg (https://www.npmjs.com/package/safejsoncontext)
 
 A JSON file with per-field access, field-level encryption under a key the
 operating system holds, optional schema validation, and a cross-process lock
