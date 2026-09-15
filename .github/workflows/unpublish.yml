@@ -34,10 +34,10 @@ on:
 jobs:
   unpublish:
     runs-on: ubuntu-latest
-    # Same NPM environment as publish, so the token resolves — and so this
+    # Same actions environment as publish, so the token resolves — and so this
     # job can be gated behind required reviewers there if you want a second
-    # pair of eyes on it (Settings → Environments → NPM → required reviewers).
-    environment: NPM
+    # pair of eyes on it (Settings → Environments → actions → required reviewers).
+    environment: actions
     permissions:
       contents: read
     steps:
@@ -61,7 +61,7 @@ jobs:
           set -euo pipefail
 
           test -n "$TOKEN" || {
-            echo "::error::NPM_TOKEN is empty — add it to the NPM environment (Settings → Environments → NPM)."
+            echo "::error::NPM_TOKEN is empty — add it to the actions environment (Settings → Environments → actions)."
             exit 1
           }
 
